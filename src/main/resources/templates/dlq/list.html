@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<title>RabbitMQ Management: Dead Lettered Queues</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Google Webfont -->
+<link
+    href='http://fonts.googleapis.com/css?family=Lato:400,300,700|Unica+One'
+    rel='stylesheet' type='text/css' />
+<!-- Themify Icons -->
+<link rel="stylesheet" href="light/css/themify-icons.css" />
+<!-- Icomoon Icons -->
+<link rel="stylesheet" href="light/css/icomoon-icons.css" />
+<!-- Bootstrap -->
+<link rel="stylesheet"
+    href="webjars/bootstrap/css/bootstrap.min.css" />
+<!-- Owl Carousel -->
+<link rel="stylesheet" href="light/css/owl.carousel.min.css" />
+<link rel="stylesheet" href="light/css/owl.theme.default.min.css" />
+<!-- Magnific Popup -->
+<link rel="stylesheet" href="light/css/magnific-popup.css" />
+<!-- Easy Responsive Tabs -->
+<link rel="stylesheet" href="light/css/easy-responsive-tabs.css" />
+<!-- Theme Style -->
+<link rel="stylesheet" href="light/css/style.css" />
+
+<script src="webjars/jquery/jquery.min.js"></script>
+<script src="webjars/bootstrap/js/bootstrap.min.js"></script>
+<script src="webjars/bootbox/bootbox.js"></script>
+</head>
+<body>
+    <header id="fh5co-header" role="banner">
+        <!--  Logo -->
+        <div id="fh5co-logo" class="text-center">
+            <a href="/deadLetteredMessages"> <img
+                src="https://www.rabbitmq.com/img/rabbitmq_logo_strap.png"
+                alt="RabbitMQ" />
+            </a>
+        </div>
+        <!-- Logo -->
+
+        <!-- Mobile Toggle Menu Button -->
+        <a href="#" class="js-fh5co-nav-toggle fh5co-nav-toggle"><i></i></a>
+
+        <!-- Main Navi -->
+        <div id="fh5co-main-nav">
+            <nav id="fh5co-nav" role="navigation">
+                <ul>
+                    <li class="active"><a
+                        href="/deadLetteredMessages">Dead Letter
+                            Message</a></li>
+                    <li><a href="/backedUpMessages">Backed Up
+                            Message</a></li>
+                </ul>
+            </nav>
+        </div>
+        <!-- Main Nav -->
+    </header>
+
+    <main role="main">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 col-md-push-4 col-sm-8 col-sm-push-4">
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <th>User</th>
+                            <td><span th:text="${username}" /></td>
+                        </tr>
+                        <tr>
+                            <th>Host</th>
+                            <td><span th:text="${hostname}" />:<span
+                                th:text="${port}" /></td>
+                        </tr>
+                        <tr>
+                            <th>Virtual Host</th>
+                            <td><span th:text="${virtualHost}" /></td>
+                        </tr>
+                        <tr>
+                            <th>Dead Letter Queue</th>
+                            <td><span th:text="${queuename}" /></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row">
+            <div class="pull-right">
+                <span>Last update:&#32;<span
+                    th:text="${#dates.format(lastUpdate, 'yyyy-MM-dd HH:mm:ss')}" />
+                </span> <a href="/deadLetteredMessages" class="btn btn-default">Update</a>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <div class="row">
+            <div class="alert alert-info" role="alert"
+                th:if="${deletedMessage}">
+                <strong>Deleted:&#32;</strong><span
+                    th:text="${deletedMessage}" />
+            </div>
+            <div class="alert alert-success" role="alert"
+                th:if="${republishedMessage}">
+                <strong>Republished:&#32;</strong><span
+                    th:text="${republishedMessage}" />
+            </div>
+        </div>
+        <div class="row">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered">
+                    <thead class="thead-default">
+                        <tr>
+                            <th>Dead Lettered Time</th>
+                            <th>Message ID</th>
+                            <th>Original Queue</th>
+                            <th>Mutex ID</th>
+                            <th>Operation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="message : ${messages}">
+                            <td><span
+                                th:if="${message.properties.headers.extraDeaths[0].time}">
+                                    <span
+                                    th:text="${#dates.format(message.properties.headers.extraDeaths[0].time, 'yyyy-MM-dd HH:mm:ss')}">Time
+                                </span>
+                            </span></td>
+                            <td
+                                th:text="${message.properties.messageId}">Message-Id</td>
+                            <td
+                                th:text="${message.properties.headers.extraDeaths[0].queue}">Queue</td>
+                            <td
+                                th:text="${message.properties.headers.extraMessageMutex}">x-message-mutex</td>
+                            <td><button type="button"
+                                    class="btn btn-info detailButton"
+                                    th:attr="data-message-id=${message.properties.messageId}">Detail</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <form id="detailForm" role="form" style="display: none;">
+            <div class="form-group">
+                <label class="control-label">Dead Lettered Time</label>
+                <p id="time" class="form-control-static"></p>
+            </div>
+            <div class="form-group">
+                <label class="control-label">Message ID</label>
+                <p id="messageId" class="form-control-static"></p>
+            </div>
+            <div class="form-group">
+                <label class="control-label">Reason</label>
+                <p id="reason" class="form-control-static"></p>
+            </div>
+            <div class="form-group">
+                <label class="control-label">Mutex ID</label>
+                <p id="mutexId" class="form-control-static"></p>
+            </div>
+            <div class="form-group">
+                <label class="control-label">Payload</label>
+                <p id="payload" class="form-control-static"></p>
+            </div>
+        </form>
+    </div>
+    </main>
+    <footer>
+        <div class="container">
+            <div class="row"></div>
+        </div>
+    </footer>
+</body>
+<script type="text/javascript">
+  $(document)
+      .ready(
+          function() {
+            $('.detailButton')
+                .on(
+                    'click',
+                    function() {
+                      // 表示したいメッセージのIDを取得
+                      var id = $(this).attr('data-message-id');
+                      // IDに対応するメッセージをサーバに問い合わせ
+                      $
+                          .ajax({
+                            url : '/deadLetteredMessages/' + id,
+                            method : 'GET'
+                          })
+                          .success(
+                              function(response) {
+                                // サーバからレスポンスがあったら、フォームの表示項目に設定
+                                $('#detailForm') //
+                                .find('[id="time"]').text(response.time).end() //
+                                .find('[id="messageId"]').text(
+                                    response.messageId).end() //
+                                .find('[id="reason"]').text(response.reason)
+                                    .end() //
+                                    .find('[id="mutexId"]').text(
+                                        response.mutexId).end() //
+                                    .find('[id="payload"]').text(
+                                        response.payload).end();
+
+                                // ダイアログを構築
+                                var messageId = response.messageId;
+                                // メッセージが削除可能かどうかを取得
+                                var deletable = response.deletable;
+                                // メッセージが再登録可能かどうかを取得
+                                var republishable = response.republishable;
+                                bootbox
+                                    .dialog(
+                                        {
+                                          title : 'Dead Lettered Message',
+                                          message : $('#detailForm'),
+                                          show : false, // 最初は未表示
+                                          closeButton : true,
+                                          animate : true,
+                                          onEscape : true,
+                                          buttons : {
+                                            deleteMessage : {
+                                              label : "Delete",
+                                              className : "btn-danger delete-button",
+                                              callback : function() {
+                                                bootbox
+                                                    .confirm(
+                                                        "Delete?",
+                                                        function(result) {
+                                                          if (result) {
+                                                            $
+                                                                .ajax(
+                                                                    {
+                                                                      url : '/deadLetteredMessages/delete/'
+                                                                          + messageId,
+                                                                      method : 'GET'
+                                                                    })
+                                                                .success(
+                                                                    function(
+                                                                        res) {
+                                                                      location.href = '/deadLetteredMessages';
+                                                                    });
+                                                          }
+                                                        });
+                                              }
+                                            },
+                                            deleteAndBackup : {
+                                              label : "Delete And Backup",
+                                              className : "btn-info delete-button",
+                                              callback : function() {
+                                                bootbox
+                                                    .confirm(
+                                                        "Delete And Backup?",
+                                                        function(result) {
+                                                          if (result) {
+                                                            $
+                                                                .ajax(
+                                                                    {
+                                                                      url : '/deadLetteredMessages/deleteAndBackup/'
+                                                                          + messageId,
+                                                                      method : 'GET'
+                                                                    })
+                                                                .success(
+                                                                    function(
+                                                                        res) {
+                                                                      location.href = '/deadLetteredMessages';
+                                                                    });
+                                                          }
+                                                        });
+                                              }
+                                            },
+                                            republish : {
+                                              label : "Republish",
+                                              className : "btn-warning republish-button",
+                                              callback : function() {
+                                                bootbox
+                                                    .confirm(
+                                                        "Republish?",
+                                                        function(result) {
+                                                          if (result) {
+                                                            $
+                                                                .ajax(
+                                                                    {
+                                                                      url : '/deadLetteredMessages/republish/'
+                                                                          + messageId,
+                                                                      method : 'GET'
+                                                                    })
+                                                                .success(
+                                                                    function(
+                                                                        res) {
+                                                                      location.href = '/deadLetteredMessages';
+                                                                    });
+                                                          }
+                                                        });
+                                              }
+                                            },
+                                            close : {
+                                              label : "Close",
+                                              className : "btn-success"
+                                            }
+                                          }
+                                        }).on(
+                                        'shown.bs.modal',
+                                        function() {
+                                          // ボタンの状態変更
+                                          $('.delete-button').prop("disabled",
+                                              !deletable);
+                                          $('.republish-button').prop(
+                                              "disabled", !republishable);
+                                          // モーダル表示
+                                          $('#detailForm').show();
+                                        }).on('hide.bs.modal', function(e) {
+                                      // Bootboxはモーダルを非表示にすると削除してしまうので、退避しておく
+                                      $('#detailForm').hide().appendTo('body');
+                                    }).modal('show');
+                              });
+                    });
+          });
+</script>
+</html>
