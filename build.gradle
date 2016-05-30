@@ -21,7 +21,7 @@ version = '1.0.0-SNAPSHOT'
 
 repositories {
   mavenLocal()
-  maven { url "http://52.69.66.154/nexus/content/repositories/spr" }
+  maven { url "http://127.0.0.1/nexus/content/repositories/spr" }
   mavenCentral()
   jcenter()
 }
