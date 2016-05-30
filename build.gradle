@@ -2,7 +2,7 @@ buildscript {
   repositories { mavenCentral() }
   ext {
     springBootVersion = '1.3.5.RELEASE'
-    nexusHost = "52.69.66.154"
+    nexusHost = "127.0.0.1"
   }
   dependencies { classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}") }
 }
