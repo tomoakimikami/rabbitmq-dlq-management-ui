@@ -62,7 +62,6 @@ dependencies {
   compile("org.springframework.boot:spring-boot-starter-thymeleaf:${springBootVersion}")
   compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}")
   compile("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
-  compile("org.webjars:webjars-locator:0.31")
   compile("org.webjars:jquery:1.10.2")
   compile("org.webjars:bootstrap:3.3.6")
   compile("org.webjars:bootbox:4.4.0")
@@ -71,8 +70,23 @@ dependencies {
   testCompile 'junit:junit:4.12'
 }
 
-// Servlet API 3.0用に、META-INF/resourcesへ静的ファイルを配置しておく
+// Mavenリポジトリへ配置する対象にソースのJARも含める
+task sourcesJar(type: Jar, dependsOn:classes) {
+  classifier = 'sources'
+  from sourceSets.main.allSource
+}
+
+artifacts {
+  archives sourcesJar
+}
+
+// spring-bootプラグインがjarの加工をするのを抑止
+bootRepackage {
+  enabled = false
+}
+
 jar {
+  baseName = 'dlq-management-ui'
   from("${projectDir}/src/main/resources/templates") {
     into "META-INF/resources/templates"
   }
@@ -81,32 +95,11 @@ jar {
   }
 }
 
-// Mavenリポジトリへ配置する対象にソースとJavaDocのJARも含める
-task sourcesJar(type: Jar, dependsOn:classes) {
-  classifier = 'sources'
-  from sourceSets.main.allSource
-}
-
-task javadocJar(type: Jar, dependsOn:javadoc) {
-  classifier = 'javadoc'
-  from javadoc.destinationDir
-}
-
-artifacts {
-  archives sourcesJar
-  archives javadocJar
-}
-
-// spring-bootプラグインがjarの加工をするのを抑止
-bootRepackage {
-  enabled = false
-}
-
 // publish
 publishing {
   publications {
-    mavenJava(MavenPublication) {
-      artifactId 'dlq-management-ui'
+    maven(MavenPublication) {
+      artifactId "${jar.baseName}"
 
       from components.java
 
