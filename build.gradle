@@ -61,6 +61,7 @@ dependencies {
   compile("org.springframework.boot:spring-boot-starter-logging:${springBootVersion}")
   compile("org.springframework.boot:spring-boot-starter-thymeleaf:${springBootVersion}")
   compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}")
+  compile("org.springframework.boot:spring-boot-configuration-processor:${springBootVersion}")
   compile("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   compile("org.webjars:jquery:1.10.2")
   compile("org.webjars:bootstrap:3.3.6")
