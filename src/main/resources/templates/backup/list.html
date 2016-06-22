@@ -182,6 +182,7 @@
         // サーバからレスポンスがあったら、フォームの表示項目に設定
         $('#detailForm') //
         .find('[id="time"]').text(response.time).end() //
+        .find('[id="messageId"]').text(response.messageId).end() //
         .find('[id="reason"]').text(response.reason).end() //
         .find('[id="mutexId"]').text(response.mutexId).end() //
         .find('[id="payload"]').text(response.payload).end();
