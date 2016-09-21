@@ -66,9 +66,20 @@ DI登録対象とするため、Applicationクラスなどに下記アノテー�
 外部ライブラリ内のコンポーネントを登録させます。
 
 ```java
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.orm.jpa.EntityScan;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+...
+
 @SpringBootApplication(scanBasePackages = {
   "アプリケーションルートパッケージ", // アプリケーション側のパッケージルート
   "rabbitmq.console"   // DLQ管理コンソールのパッケージルート
+})
+@EntityScan(basePackages = {
+  "rabbitmq.console.repository.entity" // DLQ管理コンソールのJPAエンティティパッケージルート
+})
+@EnableJpaRepositories(basePackages = {
+  "rabbitmq.console.repository" // DLQ管理コンソールのSpring Data JPAリポジトリパッケージルート
 })
 ```
 #### プロパティ設定
