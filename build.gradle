@@ -2,7 +2,6 @@ buildscript {
   repositories { mavenCentral() }
   ext {
     springBootVersion = '1.3.5.RELEASE'
-//    nexusHost = "52.69.66.154"
   }
   dependencies { classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}") }
 }
@@ -19,9 +18,11 @@ apply plugin: 'spring-boot'
 group = 'spring.support'
 version = '1.0.2-SNAPSHOT'
 
+ext['tomcat.version'] = '7.0.59'
+
 repositories {
   mavenLocal()
-  maven { url "http://${nexusHost}/nexus/content/repositories/spr" }
+  maven { url "http://${nexusHost}${nexusPath}" }
   mavenCentral()
   jcenter()
 }
@@ -48,7 +49,7 @@ eclipse {
     downloadJavadoc = true
 
     containers.remove('org.eclipse.jdt.launching.JRE_CONTAINER')
-    containers 'org.eclipse.jst.server.core.container/org.eclipse.jst.server.tomcat.runtimeTarget/Apache Tomcat v7.0'
+    containers 'org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8'
   }
 }
 
@@ -116,9 +117,9 @@ publishing {
   repositories {
     maven {
       if(project.version.endsWith('-SNAPSHOT')) {
-        url "http://${nexusHost}/nexus/content/repositories/spr-snapshots/"
+        url "http://${nexusHost}${nexusPath}-snapshots/"
       } else {
-        url "http://${nexusHost}/nexus/content/repositories/spr-releases/"
+        url "http://${nexusHost}${nexusPath}-releases/"
       }
     }
   }
