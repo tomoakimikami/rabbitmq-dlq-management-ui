@@ -1,45 +1,10 @@
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+    layout:decorator="layout">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<meta charset="utf-8" />
-<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<title>RabbitMQ Management: Dead Lettered Queues</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<!-- Google Webfont -->
-<link href='http://fonts.googleapis.com/css?family=Lato:400,300,700|Unica+One' rel='stylesheet' type='text/css' />
-<!-- Themify Icons -->
-<link rel="stylesheet" href="/light/css/themify-icons.css" />
-<!-- Icomoon Icons -->
-<link rel="stylesheet" href="/light/css/icomoon-icons.css" />
-<!-- Bootstrap -->
-<link rel="stylesheet" href="/webjars/bootstrap/3.3.6/css/bootstrap.min.css" />
-<!-- Owl Carousel -->
-<link rel="stylesheet" href="/light/css/owl.carousel.min.css" />
-<link rel="stylesheet" href="/light/css/owl.theme.default.min.css" />
-<!-- Magnific Popup -->
-<link rel="stylesheet" href="/light/css/magnific-popup.css" />
-<!-- Easy Responsive Tabs -->
-<link rel="stylesheet" href="/light/css/easy-responsive-tabs.css" />
-<!-- Theme Style -->
-<link rel="stylesheet" href="/light/css/style.css" />
-
-<script src="/webjars/jquery/1.10.2/jquery.min.js"></script>
-<script src="/webjars/bootstrap/3.3.6/js/bootstrap.min.js"></script>
-<script src="/webjars/bootbox/4.4.0/bootbox.js"></script>
+<title>RabbitMQ Management: Dead Lettered Messages</title>
 </head>
 <body>
-    <header id="fh5co-header" role="banner">
-        <!--  Logo -->
-        <div id="fh5co-logo" class="text-center">
-            <a href="/deadLetterQueues"> <img src="https://www.rabbitmq.com/img/rabbitmq_logo_strap.png" alt="RabbitMQ" />
-            </a>
-        </div>
-        <!-- Logo -->
-    </header>
-
-    <main role="main">
-    <div class="container">
+    <div layout:fragment="content">
         <div class="row">
             <div class="col-md-8 col-md-push-4 col-sm-8 col-sm-push-4">
                 <table class="table">
@@ -70,8 +35,6 @@
                 </span> <a href="#" th:href="@{/deadLetterQueues/{dlqName}/messages(dlqName=${dlqName})}" class="btn btn-default">Update</a>
             </div>
         </div>
-    </div>
-    <div class="container">
         <div class="row">
             <div class="alert alert-info" role="alert" th:if="${deletedMessage}">
                 <strong>Deleted:&#32;</strong><span th:text="${deletedMessage}" />
@@ -129,175 +92,190 @@
                 <p id="payload" class="form-control-static"></p>
             </div>
         </form>
+        <script type="text/javascript">
+                  $(document)
+                      .ready(
+                          function() {
+                            $('.detailButton')
+                                .on(
+                                    'click',
+                                    function() {
+                                      // 表示したいメッセージのIDを取得
+                                      var id = $(this).attr('data-message-id');
+                                      var dlqName = $(this).attr(
+                                          'data-dlq-name');
+                                      // IDに対応するメッセージをサーバに問い合わせ
+                                      $
+                                          .ajax(
+                                              {
+                                                url : '/deadLetterQueues/'
+                                                    + dlqName + '/message/'
+                                                    + id,
+                                                method : 'GET',
+                                                error : function(req, stat, ex) {
+                                                  bootbox
+                                                      .alert(
+                                                          "Unrecognizable Message",
+                                                          function() {
+                                                            console
+                                                                .log("Unrecognizable Message");
+                                                          });
+                                                }
+                                              })
+                                          .success(
+                                              function(response) {
+                                                // サーバからレスポンスがあったら、フォームの表示項目に設定
+                                                $('#detailForm').find(
+                                                    '[id="time"]').text(
+                                                    response.time).end().find(
+                                                    '[id="messageId"]').text(
+                                                    response.messageId).end()
+                                                    .find('[id="reason"]')
+                                                    .text(response.reason)
+                                                    .end().find(
+                                                        '[id="mutexId"]').text(
+                                                        response.mutexId).end()
+                                                    .find('[id="payload"]')
+                                                    .text(response.payload)
+                                                    .end();
+                                                // ダイアログを構築
+                                                var messageId = response.messageId;
+                                                // メッセージが削除可能かどうかを取得
+                                                var deletable = response.deletable;
+                                                // メッセージが再登録可能かどうかを取得
+                                                var republishable = response.republishable;
+                                                bootbox
+                                                    .dialog(
+                                                        {
+                                                          title : 'Dead Lettered Message',
+                                                          message : $('#detailForm'),
+                                                          show : false, // 最初は未表示
+                                                          closeButton : true,
+                                                          animate : true,
+                                                          onEscape : true,
+                                                          buttons : {
+                                                            deleteMessage : {
+                                                              label : "Delete",
+                                                              className : "btn-danger delete-button",
+                                                              callback : function() {
+                                                                bootbox
+                                                                    .confirm(
+                                                                        "Delete?",
+                                                                        function(
+                                                                            result) {
+                                                                          if (result) {
+                                                                            $
+                                                                                .ajax(
+                                                                                    {
+                                                                                      url : '/deadLetterQueues/'
+                                                                                          + dlqName
+                                                                                          + '/delete/'
+                                                                                          + messageId,
+                                                                                      method : 'GET'
+                                                                                    })
+                                                                                .success(
+                                                                                    function(
+                                                                                        res) {
+                                                                                      location.href = '/deadLetterQueues/'
+                                                                                          + dlqName
+                                                                                          + '/messages';
+                                                                                    });
+                                                                          }
+                                                                        });
+                                                              }
+                                                            },
+                                                            deleteAndBackup : {
+                                                              label : "Delete And Backup",
+                                                              className : "btn-info delete-button",
+                                                              callback : function() {
+                                                                bootbox
+                                                                    .confirm(
+                                                                        "Delete And Backup?",
+                                                                        function(
+                                                                            result) {
+                                                                          if (result) {
+                                                                            $
+                                                                                .ajax(
+                                                                                    {
+                                                                                      url : '/deadLetterQueues/'
+                                                                                          + dlqName
+                                                                                          + '/deleteAndBackup/'
+                                                                                          + messageId,
+                                                                                      method : 'GET'
+                                                                                    })
+                                                                                .success(
+                                                                                    function(
+                                                                                        res) {
+                                                                                      location.href = '/deadLetterQueues/'
+                                                                                          + dlqName
+                                                                                          + '/messages';
+                                                                                    });
+                                                                          }
+                                                                        });
+                                                              }
+                                                            },
+                                                            republish : {
+                                                              label : "Republish",
+                                                              className : "btn-warning republish-button",
+                                                              callback : function() {
+                                                                bootbox
+                                                                    .confirm(
+                                                                        "Republish?",
+                                                                        function(
+                                                                            result) {
+                                                                          if (result) {
+                                                                            $
+                                                                                .ajax(
+                                                                                    {
+                                                                                      url : '/deadLetterQueues/'
+                                                                                          + dlqName
+                                                                                          + '/republish/'
+                                                                                          + messageId,
+                                                                                      method : 'GET'
+                                                                                    })
+                                                                                .success(
+                                                                                    function(
+                                                                                        res) {
+                                                                                      location.href = '/deadLetterQueues/'
+                                                                                          + dlqName
+                                                                                          + '/messages';
+                                                                                    });
+                                                                          }
+                                                                        });
+                                                              }
+                                                            },
+                                                            close : {
+                                                              label : "Close",
+                                                              className : "btn-success"
+                                                            }
+                                                          }
+                                                        })
+                                                    .on(
+                                                        'shown.bs.modal',
+                                                        function() {
+                                                          // ボタンの状態変更
+                                                          $('.delete-button')
+                                                              .prop("disabled",
+                                                                  !deletable);
+                                                          $('.republish-button')
+                                                              .prop(
+                                                                  "disabled",
+                                                                  !republishable);
+                                                          // モーダル表示
+                                                          $('#detailForm')
+                                                              .show();
+                                                        }).on(
+                                                        'hide.bs.modal',
+                                                        function(e) {
+                                                          // Bootboxはモーダルを非表示にすると削除してしまうので、退避しておく
+                                                          $('#detailForm')
+                                                              .hide().appendTo(
+                                                                  'body');
+                                                        }).modal('show');
+                                              });
+                                    });
+                          });
+                </script>
     </div>
-    </main>
-    <footer>
-        <div class="container">
-            <div class="row"></div>
-        </div>
-    </footer>
 </body>
-<script type="text/javascript">
-  $(document)
-      .ready(
-          function() {
-            $('.detailButton')
-                .on(
-                    'click',
-                    function() {
-                      // 表示したいメッセージのIDを取得
-                      var id = $(this).attr('data-message-id');
-                      var dlqName = $(this).attr('data-dlq-name');
-                      // IDに対応するメッセージをサーバに問い合わせ
-                      $
-                          .ajax(
-                              {
-                                url : '/deadLetterQueues/' + dlqName
-                                    + '/message/' + id,
-                                method : 'GET',
-                                error : function(req, stat, ex) {
-                                  bootbox.alert("Unrecognizable Message",
-                                      function() {
-                                        console.log("Unrecognizable Message");
-                                      });
-                                }
-                              })
-                          .success(
-                              function(response) {
-                                // サーバからレスポンスがあったら、フォームの表示項目に設定
-                                $('#detailForm').find('[id="time"]').text(
-                                    response.time).end().find(
-                                    '[id="messageId"]')
-                                    .text(response.messageId).end().find(
-                                        '[id="reason"]').text(response.reason)
-                                    .end().find('[id="mutexId"]').text(
-                                        response.mutexId).end().find(
-                                        '[id="payload"]')
-                                    .text(response.payload).end();
-                                // ダイアログを構築
-                                var messageId = response.messageId;
-                                // メッセージが削除可能かどうかを取得
-                                var deletable = response.deletable;
-                                // メッセージが再登録可能かどうかを取得
-                                var republishable = response.republishable;
-                                bootbox
-                                    .dialog(
-                                        {
-                                          title : 'Dead Lettered Message',
-                                          message : $('#detailForm'),
-                                          show : false, // 最初は未表示
-                                          closeButton : true,
-                                          animate : true,
-                                          onEscape : true,
-                                          buttons : {
-                                            deleteMessage : {
-                                              label : "Delete",
-                                              className : "btn-danger delete-button",
-                                              callback : function() {
-                                                bootbox
-                                                    .confirm(
-                                                        "Delete?",
-                                                        function(result) {
-                                                          if (result) {
-                                                            $
-                                                                .ajax(
-                                                                    {
-                                                                      url : '/deadLetterQueues/'
-                                                                          + dlqName
-                                                                          + '/delete/'
-                                                                          + messageId,
-                                                                      method : 'GET'
-                                                                    })
-                                                                .success(
-                                                                    function(
-                                                                        res) {
-                                                                      location.href = '/deadLetterQueues/'
-                                                                          + dlqName
-                                                                          + '/messages';
-                                                                    });
-                                                          }
-                                                        });
-                                              }
-                                            },
-                                            deleteAndBackup : {
-                                              label : "Delete And Backup",
-                                              className : "btn-info delete-button",
-                                              callback : function() {
-                                                bootbox
-                                                    .confirm(
-                                                        "Delete And Backup?",
-                                                        function(result) {
-                                                          if (result) {
-                                                            $
-                                                                .ajax(
-                                                                    {
-                                                                      url : '/deadLetterQueues/'
-                                                                          + dlqName
-                                                                          + '/deleteAndBackup/'
-                                                                          + messageId,
-                                                                      method : 'GET'
-                                                                    })
-                                                                .success(
-                                                                    function(
-                                                                        res) {
-                                                                      location.href = '/deadLetterQueues/'
-                                                                          + dlqName
-                                                                          + '/messages';
-                                                                    });
-                                                          }
-                                                        });
-                                              }
-                                            },
-                                            republish : {
-                                              label : "Republish",
-                                              className : "btn-warning republish-button",
-                                              callback : function() {
-                                                bootbox
-                                                    .confirm(
-                                                        "Republish?",
-                                                        function(result) {
-                                                          if (result) {
-                                                            $
-                                                                .ajax(
-                                                                    {
-                                                                      url : '/deadLetterQueues/'
-                                                                          + dlqName
-                                                                          + '/republish/'
-                                                                          + messageId,
-                                                                      method : 'GET'
-                                                                    })
-                                                                .success(
-                                                                    function(
-                                                                        res) {
-                                                                      location.href = '/deadLetterQueues/'
-                                                                          + dlqName
-                                                                          + '/messages';
-                                                                    });
-                                                          }
-                                                        });
-                                              }
-                                            },
-                                            close : {
-                                              label : "Close",
-                                              className : "btn-success"
-                                            }
-                                          }
-                                        }).on(
-                                        'shown.bs.modal',
-                                        function() {
-                                          // ボタンの状態変更
-                                          $('.delete-button').prop("disabled",
-                                              !deletable);
-                                          $('.republish-button').prop(
-                                              "disabled", !republishable);
-                                          // モーダル表示
-                                          $('#detailForm').show();
-                                        }).on('hide.bs.modal', function(e) {
-                                      // Bootboxはモーダルを非表示にすると削除してしまうので、退避しておく
-                                      $('#detailForm').hide().appendTo('body');
-                                    }).modal('show');
-                              });
-                    });
-          });
-</script>
 </html>

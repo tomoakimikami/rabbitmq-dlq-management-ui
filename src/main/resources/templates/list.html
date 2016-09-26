@@ -1,45 +1,10 @@
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+    layout:decorator="layout">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<meta charset="utf-8" />
-<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<title>RabbitMQ Management: Dead Lettered Queues</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<!-- Google Webfont -->
-<link rel='stylesheet' type='text/css' href='http://fonts.googleapis.com/css?family=Lato:400,300,700|Unica+One' />
-<!-- Themify Icons -->
-<link rel="stylesheet" type="text/css" href="/light/css/themify-icons.css" />
-<!-- Icomoon Icons -->
-<link rel="stylesheet" type="text/css" href="/light/css/icomoon-icons.css" />
-<!-- Bootstrap -->
-<link rel="stylesheet" type="text/css" href="/webjars/bootstrap/3.3.6/css/bootstrap.min.css" />
-<!-- Owl Carousel -->
-<link rel="stylesheet" type="text/css" href="/light/css/owl.carousel.min.css" />
-<link rel="stylesheet" type="text/css" href="/light/css/owl.theme.default.min.css" />
-<!-- Magnific Popup -->
-<link rel="stylesheet" href="/light/css/magnific-popup.css" />
-<!-- Easy Responsive Tabs -->
-<link rel="stylesheet" href="/light/css/easy-responsive-tabs.css" />
-<!-- Theme Style -->
-<link rel="stylesheet" href="/light/css/style.css" />
-
-<script type="text/javascript" src="/webjars/jquery/1.10.2/jquery.min.js"></script>
-<script type="text/javascript" src="/webjars/bootstrap/3.3.6/js/bootstrap.min.js"></script>
-<script type="text/javascript" src="/webjars/bootbox/4.4.0/bootbox.js"></script>
+<title>RabbitMQ Management: Dead Letter Queues</title>
 </head>
 <body>
-    <header id="fh5co-header" role="banner">
-        <!--  Logo -->
-        <div id="fh5co-logo" class="text-center">
-            <a href="/deadLetterQueues"> <img src="https://www.rabbitmq.com/img/rabbitmq_logo_strap.png" alt="RabbitMQ" />
-            </a>
-        </div>
-        <!-- Logo -->
-    </header>
-
-    <main role="main">
-    <div class="container">
+    <div layout:fragment="content">
         <div class="row">
             <div class="col-md-8 col-md-push-4 col-sm-8 col-sm-push-4">
                 <table class="table">
@@ -50,8 +15,7 @@
                         </tr>
                         <tr>
                             <th>Host</th>
-                            <td><span th:text="${hostname}" />:<span
-                                th:text="${port}" /></td>
+                            <td><span th:text="${hostname}" />:<span th:text="${port}" /></td>
                         </tr>
                         <tr>
                             <th>Virtual Host</th>
@@ -89,11 +53,5 @@
             </div>
         </div>
     </div>
-    </main>
-    <footer>
-        <div class="container">
-            <div class="row"></div>
-        </div>
-    </footer>
 </body>
 </html>
