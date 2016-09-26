@@ -1,6 +1,7 @@
 package rabbitmq.console.service;
 
 import java.util.List;
+import java.util.Map;
 
 import rabbitmq.console.service.dto.DeadLetteredMessage;
 
@@ -11,60 +12,84 @@ import rabbitmq.console.service.dto.DeadLetteredMessage;
  */
 public interface QueueService {
   /**
+   * Dead Letter Queue一覧取得.
+   *
+   * @return Dead Letter Queue一覧マップ(キー:Dead Letter Queue名,値:DL Backup Queue名)
+   */
+  Map<String, String> listDeadLetterQueues();
+
+  /**
+   * Dead Letter Queue名に対応するDL Backup Queue名を導出
+   * @param dlqName Dead Letter Queue名
+   * @return DL Backup Queue名。無ければnull
+   */
+  String resolveBackupQueueName(String dlqName);
+
+  /**
    * Dead Letter メッセージ一覧取得.
    *
+   * @param dlqName 一覧取得したいDLQ名
    * @return Dead Letter メッセージ一覧
    */
-  List<DeadLetteredMessage> listDeadLetteredMessages();
+  List<DeadLetteredMessage> listDeadLetteredMessages(String dlqName);
 
   /**
    * バックアップメッセージ一覧取得.
    *
+   * @param backupQueueName 一覧取得したいバックアップキュー名
    * @return バックアップメッセージ一覧
    */
-  List<DeadLetteredMessage> listBackedUpMessages();
+  List<DeadLetteredMessage> listBackedUpMessages(String dlqName, String backupQueueName);
 
   /**
    * idに合致するDead Letterメッセージを取得.
    *
+   * @param dlqName DLQ名
    * @param id メッセージID
    * @return idに合致するメッセージ
    */
-  DeadLetteredMessage findDeadLetteredMessage(String id);
+  DeadLetteredMessage findDeadLetteredMessage(String dlqName, String id);
 
   /**
    * idに合致するバックアップメッセージを取得.
    *
+   * @param backupQueueName バックアップキュー名
    * @param id メッセージID
    * @return idに合致するメッセージ
    */
-  DeadLetteredMessage findBackedUpMessage(String id);
+  DeadLetteredMessage findBackedUpMessage(String dlqName, String backupQueueName, String id);
 
   /**
    * DLQにあるメッセージを再登録.
    *
+   * @param dlqName DLQ名
    * @param message メッセージ
    */
-  void republishMessage(DeadLetteredMessage message);
+  void republishMessage(String dlqName, DeadLetteredMessage message);
 
   /**
    * DLQにあるメッセージを削除.
    *
+   * @param dlqName DLQ名
    * @param message メッセージ
    */
-  void deleteMessage(DeadLetteredMessage message);
+  void deleteMessage(String dlqName, DeadLetteredMessage message);
 
   /**
-   * DLQにあるメッセージを削除.
+   * DLQにあるメッセージを削除してバックアップキューへ待避.
    *
+   * @param dlqName DLQ名
+   * @param backupQueueName バックアップキュー名
    * @param message メッセージ
    */
-  void deleteAndBackupMessage(DeadLetteredMessage message);
+  void deleteAndBackupMessage(String dlqName, String backupQueueName, DeadLetteredMessage message);
 
   /**
    * UnackedなメッセージをReadyにする.
+   *
+   * @param dlqName DLQ名
    */
-  void recoverAllUnackedMessages();
+  void recoverAllUnackedMessages(String dlqName);
 
   /**
    * RabbitMQ接続ユーザ名を導出する.
@@ -95,23 +120,11 @@ public interface QueueService {
   String resolveVirtualHost();
 
   /**
-   * Dead Letter Queue名を導出する.
-   *
-   * @return 導出したDead Letter Queue名
-   */
-  String resolveDeadLetterQueue();
-
-  /**
-   * Backup Queue名を導出する.
-   *
-   * @return 導出したBackup Queue名
-   */
-  String resolveBackupQueue();
-
-  /**
    * Backup QueueにあるメッセージをDead Letter Queueへ復元する.
    *
+   * @param dlqName DLQ名
+   * @param backupQueueName バックアップキュー名
    * @param message 復元したいメッセージ
    */
-  void restoreBackedUpMessage(DeadLetteredMessage message);
+  void restoreBackedUpMessage(String dlqName, String backupQueueName, DeadLetteredMessage message);
 }

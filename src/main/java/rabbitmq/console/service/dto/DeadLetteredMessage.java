@@ -69,12 +69,6 @@ public class DeadLetteredMessage {
   private String payloadEncoding = null;
 
   /**
-   * メッセージ属性.
-   */
-  @JsonProperty("properties")
-  private MessageProperties properties = new MessageProperties();
-
-  /**
    * 削除可能フラグ.
    */
   @JsonIgnore()
@@ -85,6 +79,24 @@ public class DeadLetteredMessage {
    */
   @JsonIgnore()
   private boolean republishable = false;
+
+  /**
+   * デッドレターキュー名
+   */
+  @JsonProperty("dlq_name")
+  private String dlqName = null;
+
+  /**
+   * バックアップキュー名
+   */
+  @JsonProperty("backup_queue_name")
+  private String backupQueueName = null;
+
+  /**
+   * メッセージ属性.
+   */
+  @JsonProperty("properties")
+  private MessageProperties properties = new MessageProperties();
 
   /**
    * メッセージ属性.

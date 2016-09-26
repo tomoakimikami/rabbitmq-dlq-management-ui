@@ -85,7 +85,7 @@ public class QueueServiceImpl implements QueueService {
    * {@inheritDoc}.
    */
   @Override
-  public void recoverAllUnackedMessages() {
+  public void recoverAllUnackedMessages(String dlqName) {
     rabbitTemplate.setChannelTransacted(false);
     rabbitTemplate.execute(channel -> {
       boolean requeue = true;
@@ -97,16 +97,17 @@ public class QueueServiceImpl implements QueueService {
    * {@inheritDoc}.
    */
   @Override
-  public List<DeadLetteredMessage> listDeadLetteredMessages() {
-    return listMessages(dlqProperties.getDeadLetterQueue());
+  public List<DeadLetteredMessage> listDeadLetteredMessages(String deadLetterQueueName) {
+    return listMessages(deadLetterQueueName, null);
   }
 
   /**
    * {@inheritDoc}.
+   * @param backupQueueName2
    */
   @Override
-  public List<DeadLetteredMessage> listBackedUpMessages() {
-    return listMessages(dlqProperties.getBackupOnDeleteQueue());
+  public List<DeadLetteredMessage> listBackedUpMessages(String dlqName, String backupQueueName) {
+    return listMessages(dlqName, backupQueueName);
   }
 
   /**
@@ -115,7 +116,8 @@ public class QueueServiceImpl implements QueueService {
    * @param queueName キュー名
    * @return メッセージ一覧
    */
-  private List<DeadLetteredMessage> listMessages(final String queueName) {
+  private List<DeadLetteredMessage> listMessages(String dlqName, String backupQueueName) {
+    final String queueName = StringUtils.isEmpty(backupQueueName) ? dlqName : backupQueueName;
     rabbitTemplate.setChannelTransacted(true);
     List<DeadLetteredMessage> messageList = rabbitTemplate.execute(channel -> {
       List<DeadLetteredMessage> list = new ArrayList<>();
@@ -133,6 +135,8 @@ public class QueueServiceImpl implements QueueService {
         if (message == null) { // 対象外メッセージはスキップ
           continue;
         }
+        message.setDlqName(dlqName);
+        message.setBackupQueueName(backupQueueName);
         log.debug(message.toString());
         list.add(message);
         // すべてNack(Unack)して、後でReadyに戻す。
@@ -201,8 +205,8 @@ public class QueueServiceImpl implements QueueService {
         dlMessage.setRepublishable(true);
         dlMessage.setDeletable(true);
       } else { // ヘッダがある場合
-        boolean exists =
-            rabbitMqMutexRepository.exists(Long.valueOf(messageHeader.getExtraMessageMutex()));
+        boolean exists = rabbitMqMutexRepository
+            .exists(Long.valueOf(messageHeader.getExtraMessageMutex()));
         // RABBITMQ_MUTEXテーブルにMutex IDが存在すれば再登録OK
         dlMessage.setRepublishable(exists);
         // RABBITMQ_MUTEXテーブルにMutex IDが存在していたら削除不可
@@ -230,7 +234,7 @@ public class QueueServiceImpl implements QueueService {
    */
   @Transactional(readOnly = false)
   @Override
-  public void republishMessage(DeadLetteredMessage message) {
+  public void republishMessage(String dlqName, DeadLetteredMessage message) {
     if (message == null) {
       return;
     }
@@ -241,7 +245,7 @@ public class QueueServiceImpl implements QueueService {
       channel.basicQos(prefetchCount);
       while (true) {
         boolean autoAck = false;
-        GetResponse response = channel.basicGet(dlqProperties.getDeadLetterQueue(), autoAck);
+        GetResponse response = channel.basicGet(dlqName, autoAck);
         if (response == null) {
           break;
         }
@@ -253,7 +257,8 @@ public class QueueServiceImpl implements QueueService {
           log.info(
               String.format("Message Acked: %s, %s", extraDeath.getTime(), extraDeath.getQueue()));
           // 再登録
-          republishDeadLetteredMessage(channel, response);
+          republishDeadLetteredMessage(dlqName, channel,
+              response);
         } else {
           boolean requeue = true;
           channel.basicNack(response.getEnvelope().getDeliveryTag(), multiple, requeue);
@@ -268,12 +273,13 @@ public class QueueServiceImpl implements QueueService {
   /**
    * 受信したDead Letterメッセージを元のキューへ再登録する.
    *
+   * @param dlqName DLQ名
    * @param channel チャネル
    * @param response 受信メッセージ
    * @throws IOException IOエラー発生時
    */
-  private void republishDeadLetteredMessage(Channel channel, GetResponse response)
-      throws IOException {
+  private void republishDeadLetteredMessage(String dlqName, Channel channel,
+      GetResponse response) throws IOException {
     Map<String, Object> extraDeathMap = extractXDeathMap(response);
     if (extraDeathMap.isEmpty()) {
       return;
@@ -360,7 +366,7 @@ public class QueueServiceImpl implements QueueService {
    */
   @Transactional(readOnly = false)
   @Override
-  public void deleteMessage(DeadLetteredMessage message) {
+  public void deleteMessage(String dlqName, DeadLetteredMessage message) {
     if (message == null) {
       return;
     }
@@ -372,7 +378,7 @@ public class QueueServiceImpl implements QueueService {
       channel.basicQos(prefetchCount);
       while (true) {
         boolean autoAck = false;
-        GetResponse response = channel.basicGet(dlqProperties.getDeadLetterQueue(), autoAck);
+        GetResponse response = channel.basicGet(dlqName, autoAck);
         if (response == null) {
           break;
         }
@@ -401,7 +407,7 @@ public class QueueServiceImpl implements QueueService {
    * {@inheritDoc}.
    */
   @Override
-  public void deleteAndBackupMessage(DeadLetteredMessage message) {
+  public void deleteAndBackupMessage(String dlqName, String backupQueueName, DeadLetteredMessage message) {
     if (message == null) {
       return;
     }
@@ -413,7 +419,7 @@ public class QueueServiceImpl implements QueueService {
       channel.basicQos(prefetchCount);
       while (true) {
         boolean autoAck = false;
-        GetResponse response = channel.basicGet(dlqProperties.getDeadLetterQueue(), autoAck);
+        GetResponse response = channel.basicGet(dlqName, autoAck);
         if (response == null) {
           break;
         }
@@ -422,7 +428,7 @@ public class QueueServiceImpl implements QueueService {
         boolean multiple = false;
         if (isSameMessage(message, response)) {
           // 削除対象メッセージをバックアップキューへ登録
-          backupDeadLetteredMessage(channel, response);
+          backupDeadLetteredMessage(dlqName, backupQueueName, channel, response);
           channel.basicAck(response.getEnvelope().getDeliveryTag(), multiple);
           log.info(
               String.format("Message Acked: %s, %s", extraDeath.getTime(), extraDeath.getQueue()));
@@ -444,7 +450,7 @@ public class QueueServiceImpl implements QueueService {
    * {@inheritDoc}.
    */
   @Override
-  public void restoreBackedUpMessage(DeadLetteredMessage message) {
+  public void restoreBackedUpMessage(String dlqName, String backupQueueName, DeadLetteredMessage message) {
     if (message == null) {
       return;
     }
@@ -456,7 +462,7 @@ public class QueueServiceImpl implements QueueService {
       channel.basicQos(prefetchCount);
       while (true) {
         boolean autoAck = false;
-        GetResponse response = channel.basicGet(dlqProperties.getBackupOnDeleteQueue(), autoAck);
+        GetResponse response = channel.basicGet(backupQueueName, autoAck);
         if (response == null) {
           break;
         }
@@ -465,7 +471,7 @@ public class QueueServiceImpl implements QueueService {
         boolean multiple = false;
         if (isSameMessage(message, response)) {
           // 復元対象メッセージをDead Letterキューへ登録
-          restoreBackedUpMessage(channel, response);
+          restoreBackedUpMessage(dlqName, backupQueueName, channel, response);
           channel.basicAck(response.getEnvelope().getDeliveryTag(), multiple);
           log.info(
               String.format("Message Acked: %s, %s", extraDeath.getTime(), extraDeath.getQueue()));
@@ -490,11 +496,11 @@ public class QueueServiceImpl implements QueueService {
    * @param response メッセージ
    * @throws IOException IOエラー発生時
    */
-  private void restoreBackedUpMessage(Channel channel, GetResponse response) throws IOException {
+  private void restoreBackedUpMessage(String dlqName, String backupQueueName, Channel channel, GetResponse response) throws IOException {
     BasicProperties props = response.getProps();
     byte[] body = response.getBody();
     String exchange = "";
-    String routingKey = dlqProperties.getDeadLetterQueue();
+    String routingKey = dlqName;
     boolean mandatory = false;
     boolean immediate = false;
     channel.basicPublish(exchange, routingKey, mandatory, immediate, props, body);
@@ -508,11 +514,11 @@ public class QueueServiceImpl implements QueueService {
    * @param response 受信メッセージ
    * @throws IOException IOエラー発生時
    */
-  private void backupDeadLetteredMessage(Channel channel, GetResponse response) throws IOException {
+  private void backupDeadLetteredMessage(String dlqName, String backupQueueName, Channel channel, GetResponse response) throws IOException {
     BasicProperties props = response.getProps();
     byte[] body = response.getBody();
     String exchange = "";
-    String routingKey = dlqProperties.getBackupOnDeleteQueue();
+    String routingKey = backupQueueName;
     boolean mandatory = false;
     boolean immediate = false;
     channel.basicPublish(exchange, routingKey, mandatory, immediate, props, body);
@@ -556,8 +562,8 @@ public class QueueServiceImpl implements QueueService {
    * {@inheritDoc}.
    */
   @Override
-  public DeadLetteredMessage findDeadLetteredMessage(String id) {
-    List<DeadLetteredMessage> messages = listDeadLetteredMessages();
+  public DeadLetteredMessage findDeadLetteredMessage(String dlqName, String id) {
+    List<DeadLetteredMessage> messages = listDeadLetteredMessages(dlqName);
     return messages.stream()//
         .filter(message -> id.equals(message.getProperties().getMessageId()))//
         .findFirst()//
@@ -568,8 +574,8 @@ public class QueueServiceImpl implements QueueService {
    * {@inheritDoc}.
    */
   @Override
-  public DeadLetteredMessage findBackedUpMessage(String id) {
-    List<DeadLetteredMessage> messages = listBackedUpMessages();
+  public DeadLetteredMessage findBackedUpMessage(String dlqName, String backupQueueName, String id) {
+    List<DeadLetteredMessage> messages = listBackedUpMessages(dlqName, backupQueueName);
     return messages.stream()//
         .filter(message -> id.equals(message.getProperties().getMessageId()))//
         .findFirst()//
@@ -612,7 +618,7 @@ public class QueueServiceImpl implements QueueService {
    * {@inheritDoc}.
    */
   @Override
-  public String resolveDeadLetterQueue() {
+  public Map<String, String> listDeadLetterQueues() {
     return dlqProperties.getDeadLetterQueue();
   }
 
@@ -620,7 +626,7 @@ public class QueueServiceImpl implements QueueService {
    * {@inheritDoc}.
    */
   @Override
-  public String resolveBackupQueue() {
-    return dlqProperties.getBackupOnDeleteQueue();
+  public String resolveBackupQueueName(String dlqName) {
+    return listDeadLetterQueues().get(dlqName);
   }
 }
