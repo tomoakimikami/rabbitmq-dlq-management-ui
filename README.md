@@ -61,9 +61,9 @@ compile('spring.supprt:spring-rabbit-support:1.0.0')
 
 #### パッケージ指定
 
-デフォルトだと、Spring Bootは、外部ライブラリ内に定義されたBeanを探してDI登録したりはしないので、
-DI登録対象とするため、Applicationクラスなどに下記アノテーションを追加して、
-外部ライブラリ内のコンポーネントを登録させます。
+Spring Bootは、外部ライブラリ内に定義されたBeanを探して勝手にDI登録したりはしないので、
+本ライブラリをDI登録対象とするため、Applicationクラスなどに下記アノテーションを追加して、
+ライブラリのコンポーネントを登録させます。
 
 ```java
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -84,14 +84,28 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 ```
 #### プロパティ設定
 
-DLQ管理コンソールは、Spring BootのRabbitMQサーバ接続用プロパティ(spring.rabbitmq.*)および、
-DLQ関連の独自プロパティを参照して動作します。
+DLQ管理コンソールは、Spring BootのDB接続用プロパティ(spring.datasource.*)とRabbitMQサーバ接続用プロパティ(spring.rabbitmq.*)および、
+DLQ関連の独自プロパティ(dlq.rabbitmq.*)を参照して動作します。
 
 ```yaml:application.yaml(例)
+spring:
+    datasource:
+        driver-class-name:  net.sf.log4jdbc.DriverSpy
+        url:                jdbc:log4jdbc:oracle:thin:@localhost:1521:xe
+        username:           HR
+        password:           HR
+        schema:             HR
+    rabbitmq:
+        addresses: localhost:5672,localhost:5673,localhost:5674
+        username: user
+        password: pass
+        virtual-host: /
 dlq:
     rabbitmq:
-        dead-letter-queue: error.queue # Dead Letterメッセージ・キュー
-        backup-on-delete-queue: backup.on.delete.queue # Dead Letterメッセージバックアップキュー
+        dead-letter-queue:
+            error.queue: backup.on.delete.queue
+            error.queue2: backup.on.delete.queue2
+            null.queue:
         max-count: 20 # Dead Letterメッセージ一覧表示最大件数
 ```
 
@@ -100,12 +114,5 @@ dlq:
 Spring Bootアプリケーションに組み込んで起動し、下記URLへアクセスします。
 
 ```
-http://ホスト名:ポート/deadLetteredMessages
-```
-
-なお、DLQ管理コンソールでは、下記パスを使用しますので、本体のアプリケーションと重複しないように注意してください。
-
-```
-/deadLetteredMessages
-/backedUpMessages
+http://ホスト名:ポート/deadLetterQueues
 ```
