@@ -90,8 +90,10 @@ DLQ関連の独自プロパティを参照して動作します。
 ```yaml:application.yaml(例)
 dlq:
     rabbitmq:
-        dead-letter-queue: error.queue # Dead Letterメッセージ・キュー
-        backup-on-delete-queue: backup.on.delete.queue # Dead Letterメッセージバックアップキュー
+        dead-letter-queue:
+            error.queue: backup.on.delete.queue
+            error.queue2: backup.on.delete.queue2
+            null.queue:
         max-count: 20 # Dead Letterメッセージ一覧表示最大件数
 ```
 
