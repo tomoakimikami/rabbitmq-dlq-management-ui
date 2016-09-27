@@ -1,0 +1,57 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+    layout:decorator="layout">
+<head>
+<title>RabbitMQ Management: Dead Letter Queues</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="row">
+            <div class="col-md-8 col-md-push-4 col-sm-8 col-sm-push-4">
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <th>User</th>
+                            <td><span th:text="${username}" /></td>
+                        </tr>
+                        <tr>
+                            <th>Host</th>
+                            <td><span th:text="${hostname}" />:<span th:text="${port}" /></td>
+                        </tr>
+                        <tr>
+                            <th>Virtual Host</th>
+                            <td><span th:text="${virtualHost}" /></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row">
+            <div class="pull-right">
+                <span>Last update:&#32;<span th:text="${#dates.format(lastUpdate, 'yyyy-MM-dd HH:mm:ss')}" />
+                </span> <a href="/deadLetterQueues" class="btn btn-default">Update</a>
+            </div>
+        </div>
+        <div class="row">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered">
+                    <thead class="thead-default">
+                        <tr>
+                            <th>Dead Lettere Queue</th>
+                            <th>Backup Queue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="queue : ${queues}">
+                            <td><a href="#" th:href="@{/deadLetterQueues/{dlqName}/messages(dlqName=${queue.dlqName})}"> <span
+                                    th:text="${queue.dlqName}" />
+                            </a></td>
+                            <td><a href="#" th:href="@{/deadLetterQueues/{dlqName}/archivedMessages(dlqName=${queue.dlqName})}"><span
+                                    th:text="${queue.backupQueueName}" /></a></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<title>RabbitMQ Management: Dead Lettered Queues</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Google Webfont -->
+<link rel='stylesheet' type='text/css' href='http://fonts.googleapis.com/css?family=Lato:400,300,700|Unica+One' />
+<!-- Themify Icons -->
+<link rel="stylesheet" type="text/css" href="/light/css/themify-icons.css" />
+<!-- Icomoon Icons -->
+<link rel="stylesheet" type="text/css" href="/light/css/icomoon-icons.css" />
+<!-- Bootstrap -->
+<link rel="stylesheet" type="text/css" href="/webjars/bootstrap/3.3.6/css/bootstrap.min.css" />
+<!-- Owl Carousel -->
+<link rel="stylesheet" type="text/css" href="/light/css/owl.carousel.min.css" />
+<link rel="stylesheet" type="text/css" href="/light/css/owl.theme.default.min.css" />
+<!-- Magnific Popup -->
+<link rel="stylesheet" href="/light/css/magnific-popup.css" />
+<!-- Easy Responsive Tabs -->
+<link rel="stylesheet" href="/light/css/easy-responsive-tabs.css" />
+<!-- Theme Style -->
+<link rel="stylesheet" href="/light/css/style.css" />
+<!-- Custom Style -->
+<link rel="stylesheet" href="/css/style.css" />
+
+<script type="text/javascript" src="/webjars/jquery/1.10.2/jquery.min.js"></script>
+<script type="text/javascript" src="/webjars/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/webjars/bootbox/4.4.0/bootbox.js"></script>
+</head>
+<body>
+    <!-- ヘッダ -->
+    <nav class="navbar navbar-default" role="navigation">
+        <div class="container-fluid">
+
+            <!-- ブランド -->
+            <div class="navbar-header">
+                <a class="navbar-brand" th:href="@{/deadLetterQueues}"></a>
+            </div>
+
+            <!-- ナビゲーション -->
+            <div class="collapse navbar-collapse">
+                <ul class="nav navbar-nav">
+                </ul>
+                <p class="navbar-text navbar-right"><a th:href="@{/deadLetterQueues}" class="navbar-link">QUEUE LIST</a></p>
+            </div>
+        </div>
+    </nav>
+
+    <!-- コンテンツ -->
+    <div class="container" style="padding: 20px 0;">
+        <div layout:fragment="content">Contents is here!</div>
+    </div>
+</body>
+</html>
