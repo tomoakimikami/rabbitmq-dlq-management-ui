@@ -25,6 +25,7 @@ import com.rabbitmq.client.GetResponse;
 import com.rabbitmq.client.LongString;
 
 import lombok.extern.slf4j.Slf4j;
+import rabbitmq.console.component.BasicPublishException;
 import rabbitmq.console.configuration.DlqProperties;
 import rabbitmq.console.repository.RabbitMqMutexRepository;
 import rabbitmq.console.repository.entity.RabbitMqMutex;
@@ -316,7 +317,7 @@ public class QueueServiceImpl implements QueueService {
       try {
         republishDeadLetteredMessage(channel, response);
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BasicPublishException(e);
       }
     });
   }
