@@ -1,0 +1,10 @@
+/*
+ * ƒƒS
+ */
+.navbar-brand {
+	background: url("https://www.rabbitmq.com/img/rabbitmq_logo_strap.png")
+		no-repeat left center;
+	background-size: contain;
+	height: 33px;
+	width: 175px;
+}

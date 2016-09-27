@@ -1,0 +1,30 @@
+server:
+    port: 15601
+spring:
+    datasource:
+        driver-class-name:  net.sf.log4jdbc.DriverSpy
+        url:                jdbc:log4jdbc:oracle:thin:@localhost:49161:xe
+        username:           HR
+        password:           HR
+        schema:             HR
+    rabbitmq:
+        addresses: localhost:5672,localhost:5673,localhost:5674
+        username: guest
+        password: guest
+        virtual-host: /
+dlq:
+    rabbitmq:
+        dead-letter-queue:
+          error.queue: backup.on.delete.queue
+          null.queue:
+        max-count: 20
+logging:
+    level:
+        ROOT: WARN
+        rabbitmq.console: DEBUG
+        org.springframework.web.client.RestTemplate: INFO
+        jdbc.connection: INFO
+        jdbc.sqltiming: INFO
+        jdbc.audit: OFF
+        jdbc.resultset: OFF
+        jdbc.sqlonly: OFF

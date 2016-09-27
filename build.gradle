@@ -1,0 +1,126 @@
+buildscript {
+  repositories { mavenCentral() }
+  ext {
+    springBootVersion = '1.3.5.RELEASE'
+  }
+  dependencies { classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}") }
+}
+
+task wrapper(type: Wrapper) { gradleVersion = '2.13' }
+
+apply plugin: 'java'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+apply plugin: 'spring-boot'
+
+group = 'spring.support'
+version = '1.0.2-SNAPSHOT'
+
+ext['tomcat.version'] = '7.0.59'
+
+repositories {
+  mavenLocal()
+  maven { url "http://${nexusHost}${nexusPath}" }
+  mavenCentral()
+  jcenter()
+}
+
+// javacオプション
+compileJava {
+  options.encoding = 'UTF-8'
+}
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+// eclipse用プロジェクトファイル設定
+eclipse {
+  project {
+    natures 'org.eclipse.wst.jsdt.core.jsNature'
+    natures 'org.springframework.ide.eclipse.core.springnature'
+    natures 'org.springsource.ide.eclipse.gradle.core.nature'
+
+    buildCommand 'org.eclipse.wst.jsdt.core.javascriptValidator'
+    buildCommand 'org.springframework.ide.eclipse.core.springbuilder'
+  }
+  classpath {
+    downloadSources = true
+    downloadJavadoc = true
+
+    containers.remove('org.eclipse.jdt.launching.JRE_CONTAINER')
+    containers 'org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8'
+  }
+}
+
+// 依存ライブラリ。compileOnlyを使ってるので、Gradle2.2以降専用
+dependencies {
+  compile("org.springframework.boot:spring-boot-starter-amqp:${springBootVersion}")
+  compile("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
+  compile("org.springframework.boot:spring-boot-starter-data-jpa:${springBootVersion}")
+  compile("org.springframework.boot:spring-boot-starter-jdbc:${springBootVersion}")
+  compile("org.springframework.boot:spring-boot-starter-logging:${springBootVersion}")
+  compile("org.springframework.boot:spring-boot-starter-thymeleaf:${springBootVersion}")
+  compile("org.springframework.boot:spring-boot-starter-web:${springBootVersion}")
+  compile("org.springframework.boot:spring-boot-configuration-processor:${springBootVersion}")
+  compile("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+  compile("org.webjars:jquery:1.10.2")
+  compile("org.webjars:bootstrap:3.3.6")
+  compile("org.webjars:bootbox:4.4.0")
+  compileOnly("org.projectlombok:lombok:1.16.8")
+  compile 'org.slf4j:slf4j-api:1.7.21'
+  testCompile 'junit:junit:4.12'
+}
+
+// Mavenリポジトリへ配置する対象にソースのJARも含める
+task sourcesJar(type: Jar, dependsOn:classes) {
+  classifier = 'sources'
+  from sourceSets.main.allSource
+}
+
+artifacts {
+  archives sourcesJar
+}
+
+// spring-bootプラグインがjarの加工をするのを抑止
+bootRepackage {
+  enabled = false
+}
+
+jar {
+  baseName = 'dlq-management-ui'
+  from("${projectDir}/src/main/resources/templates") {
+    into "META-INF/resources/templates"
+  }
+  from("${projectDir}/src/main/resources/static") {
+    into "META-INF/resources/static"
+  }
+}
+
+// publish
+publishing {
+  publications {
+    maven(MavenPublication) {
+      artifactId "${jar.baseName}"
+
+      from components.java
+
+      artifact sourcesJar {
+        classifier "sources"
+      }
+
+      pom.withXml {
+        asNode().appendNode('description', 'Embeddable RabbitMQ DLQ Management Console')
+      }
+    }
+  }
+  repositories {
+    maven {
+      if(project.version.endsWith('-SNAPSHOT')) {
+        url "http://${nexusHost}${nexusPath}-snapshots/"
+      } else {
+        url "http://${nexusHost}${nexusPath}-releases/"
+      }
+    }
+  }
+}
