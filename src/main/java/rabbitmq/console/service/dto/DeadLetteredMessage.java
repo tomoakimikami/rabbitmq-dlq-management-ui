@@ -81,13 +81,13 @@ public class DeadLetteredMessage {
   private boolean republishable = false;
 
   /**
-   * デッドレターキュー名
+   * Dead Letter Queue名
    */
   @JsonProperty("dlq_name")
   private String dlqName = null;
 
   /**
-   * バックアップキュー名
+   * Backup Queue名
    */
   @JsonProperty("backup_queue_name")
   private String backupQueueName = null;

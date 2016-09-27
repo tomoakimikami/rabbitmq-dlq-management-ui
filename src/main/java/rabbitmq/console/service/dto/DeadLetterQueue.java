@@ -16,12 +16,12 @@ import lombok.ToString;
 @ToString
 public class DeadLetterQueue {
   /**
-   * DLQ名
+   * Dead Letter Queue名
    */
   private String dlqName;
 
   /**
-   * バックアップキュー名
+   * Backup Queue名
    */
   private String backupQueueName;
 }

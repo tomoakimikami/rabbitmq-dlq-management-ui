@@ -83,6 +83,15 @@ public class DeadLetterQueuesController {
   }
 
   /**
+   * Dead Letter Messageリストページへのリダイレクト用識別子を書式整形する
+   * @param dlqName Dead Letter Queue名
+   * @return 整形結果
+   */
+  private String formatRedirectToDlqMessageList(String dlqName) {
+    return String.format("redirect:/deadLetterQueues/%s/messages", dlqName);
+  }
+
+  /**
    * Dead Letter Queue一覧表示.
    *
    * @param model モデル
@@ -97,7 +106,7 @@ public class DeadLetterQueuesController {
     List<DeadLetterQueue> queues = queueService.listDeadLetterQueues()//
         .entrySet()//
         .stream()//
-        .map((entry) -> {
+        .map(entry -> {
           DeadLetterQueue queue = new DeadLetterQueue();
           queue.setDlqName(entry.getKey());
           queue.setBackupQueueName(entry.getValue());
@@ -110,9 +119,9 @@ public class DeadLetterQueuesController {
   }
 
   /**
-   * DLQメッセージ一覧表示
+   * Dead Letter Queueメッセージ一覧表示
    *
-   * @param dlqName DLQ名
+   * @param dlqName Dead Letter Queue名
    * @param model モデル
    * @return View指定キー
    */
@@ -134,6 +143,7 @@ public class DeadLetterQueuesController {
   /**
    * Dead Letter Queueメッセージ取得.
    *
+   * @param dlqName Dead Letter Queue名
    * @param id メッセージid
    * @return メッセージ
    */
@@ -146,13 +156,13 @@ public class DeadLetterQueuesController {
     if (message == null) {
       throw new ResourceNotFoundException();
     }
-    MessageResponse response = convertToResponse(message);
-    return response;
+    return convertToResponse(message);
   }
 
   /**
    * Dead Letter Queueメッセージ削除.
    *
+   * @param dlqName Dead Letter Queue名
    * @param id メッセージid
    * @param attributes リダイレクト属性
    * @param model モデル
@@ -169,12 +179,13 @@ public class DeadLetterQueuesController {
 
     // 削除完了メッセージを渡す
     attributes.addFlashAttribute("deletedMessage", messageIdentity(message));
-    return "redirect:/deadLetterQueues";
+    return formatRedirectToDlqMessageList(dlqName);
   }
 
   /**
    * Dead Letter Queueメッセージ削除およびバックアップ.
    *
+   * @param dlqName Dead Letter Queue名
    * @param id メッセージid
    * @param attributes リダイレクト属性
    * @param model モデル
@@ -192,12 +203,13 @@ public class DeadLetterQueuesController {
 
     // 削除完了メッセージを渡す
     attributes.addFlashAttribute("deletedMessage", messageIdentity(message));
-    return "redirect:/deadLetterQueues";
+    return formatRedirectToDlqMessageList(dlqName);
   }
 
   /**
    * Dead Letter Queueメッセージ再登録.
    *
+   * @param dlqName Dead Letter Queue名
    * @param id メッセージid
    * @param attributes リダイレクト属性
    * @param model モデル
@@ -214,11 +226,11 @@ public class DeadLetterQueuesController {
 
     // 再登録完了メッセージを渡す
     attributes.addFlashAttribute("republishedMessage", messageIdentity(message));
-    return "redirect:/deadLetterQueues";
+    return formatRedirectToDlqMessageList(dlqName);
   }
 
   /**
-   * バックアップキューメッセージ一覧表示
+   * Backup Queueメッセージ一覧表示
    *
    * @param dlqName dlq名
    * @param model モデル
@@ -229,18 +241,18 @@ public class DeadLetterQueuesController {
     // 共通属性
     addCommonModelAttributes(model);
 
-    // DLQに対応するバックアップキュー名を導出
+    // Dead Letter Queueに対応するBackup Queue名を導出
     String backupQueueName = queueService.resolveBackupQueueName(dlqName);
     if (StringUtils.isEmpty(backupQueueName)) {
       throw new ResourceNotFoundException(); // 404を返す
     }
 
-    // Dead Letter キュー
+    // Dead Letter Queue名
     model.addAttribute("dlqName", dlqName);
-    // バックアップキュー
+    // Backup Queue名
     model.addAttribute("backupQueueName", backupQueueName);
 
-    // バックアップキュー メッセージ
+    // Backup Queue メッセージ
     List<DeadLetteredMessage> messages = queueService.listBackedUpMessages(dlqName, backupQueueName);
     model.addAttribute("messages", messages);
 
@@ -248,8 +260,9 @@ public class DeadLetterQueuesController {
   }
 
   /**
-   * バックアップキューメッセージ取得.
+   * Backup Queueメッセージ取得.
    *
+   * @param dlqName Dead Letter Queue名
    * @param id メッセージid
    * @return メッセージ
    */
@@ -258,20 +271,20 @@ public class DeadLetterQueuesController {
   @ResponseBody
   public MessageResponse findBackedUpMessage(@PathVariable String dlqName,
       @PathVariable String id) {
-    // DLQに対応するバックアップキュー名を導出
+    // Dead Letter Queueに対応するBackup Queue名を導出
     String backupQueueName = queueService.resolveBackupQueueName(dlqName);
     if (StringUtils.isEmpty(backupQueueName)) {
       throw new ResourceNotFoundException(); // 404を返す
     }
 
     DeadLetteredMessage message = queueService.findBackedUpMessage(dlqName, backupQueueName, id);
-    MessageResponse response = convertToResponse(message);
-    return response;
+    return convertToResponse(message);
   }
 
   /**
    * Backup Queueメッセージリストア.
    *
+   * @param dlqName Dead Letter Queue名
    * @param id メッセージid
    * @param attributes リダイレクト属性
    * @param model モデル
@@ -280,7 +293,7 @@ public class DeadLetterQueuesController {
   @RequestMapping(path = "/{dlqName}/restore/{id}", method = RequestMethod.GET)
   public String restoreBackedUpMessage(@PathVariable String dlqName, @PathVariable String id,
       RedirectAttributes attributes, Model model) {
-    // DLQに対応するバックアップキュー名を導出
+    // Dead Letter Queueに対応するBackup Queue名を導出
     String backupQueueName = queueService.resolveBackupQueueName(dlqName);
     if (StringUtils.isEmpty(backupQueueName)) {
       throw new ResourceNotFoundException(); // 404を返す
@@ -340,8 +353,7 @@ public class DeadLetterQueuesController {
    */
   private String abbreviatePayload(String payload) {
     final int maxSize = 256;
-    String result = org.thymeleaf.util.StringUtils.abbreviate(payload, maxSize);
-    return result;
+    return org.thymeleaf.util.StringUtils.abbreviate(payload, maxSize);
   }
 
   /**

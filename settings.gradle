@@ -16,4 +16,4 @@ include 'api'
 include 'services:webservice'
 */
 
-rootProject.name = 'spr-dlq-management-ui'
+rootProject.name = 'rabbitmq-dlq-management-ui'

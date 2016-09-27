@@ -14,14 +14,14 @@ public interface QueueService {
   /**
    * Dead Letter Queue一覧取得.
    *
-   * @return Dead Letter Queue一覧マップ(キー:Dead Letter Queue名,値:DL Backup Queue名)
+   * @return Dead Letter Queue一覧マップ(キー:Dead Letter Queue名,値:Backup Queue名)
    */
   Map<String, String> listDeadLetterQueues();
 
   /**
-   * Dead Letter Queue名に対応するDL Backup Queue名を導出
+   * Dead Letter Queue名に対応するBackup Queue名を導出
    * @param dlqName Dead Letter Queue名
-   * @return DL Backup Queue名。無ければnull
+   * @return Backup Queue名。無ければnull
    */
   String resolveBackupQueueName(String dlqName);
 
@@ -36,7 +36,8 @@ public interface QueueService {
   /**
    * バックアップメッセージ一覧取得.
    *
-   * @param backupQueueName 一覧取得したいバックアップキュー名
+   * @param dlqName Dead Letter Queue名
+   * @param backupQueueName 一覧取得したいBackup Queue名
    * @return バックアップメッセージ一覧
    */
   List<DeadLetteredMessage> listBackedUpMessages(String dlqName, String backupQueueName);
@@ -44,7 +45,7 @@ public interface QueueService {
   /**
    * idに合致するDead Letterメッセージを取得.
    *
-   * @param dlqName DLQ名
+   * @param dlqName Dead Letter Message名
    * @param id メッセージID
    * @return idに合致するメッセージ
    */
@@ -53,32 +54,33 @@ public interface QueueService {
   /**
    * idに合致するバックアップメッセージを取得.
    *
-   * @param backupQueueName バックアップキュー名
+   * @param dlqName Dead Letter Queue名
+   * @param backupQueueName Backup Queue名
    * @param id メッセージID
    * @return idに合致するメッセージ
    */
   DeadLetteredMessage findBackedUpMessage(String dlqName, String backupQueueName, String id);
 
   /**
-   * DLQにあるメッセージを再登録.
+   * Dead Letter Queueにあるメッセージを再登録.
    *
-   * @param dlqName DLQ名
+   * @param dlqName Dead Letter Queue名
    * @param message メッセージ
    */
   void republishMessage(String dlqName, DeadLetteredMessage message);
 
   /**
-   * DLQにあるメッセージを削除.
+   * Dead Letter Queueにあるメッセージを削除.
    *
-   * @param dlqName DLQ名
+   * @param dlqName Dead Letter Queue名
    * @param message メッセージ
    */
   void deleteMessage(String dlqName, DeadLetteredMessage message);
 
   /**
-   * DLQにあるメッセージを削除してバックアップキューへ待避.
+   * Dead Letter Queueにあるメッセージを削除してバックアップキューへ待避.
    *
-   * @param dlqName DLQ名
+   * @param dlqName Dead Letter Queue名
    * @param backupQueueName バックアップキュー名
    * @param message メッセージ
    */
@@ -87,7 +89,7 @@ public interface QueueService {
   /**
    * UnackedなメッセージをReadyにする.
    *
-   * @param dlqName DLQ名
+   * @param dlqName Dead Letter Queue名
    */
   void recoverAllUnackedMessages(String dlqName);
 
@@ -122,8 +124,8 @@ public interface QueueService {
   /**
    * Backup QueueにあるメッセージをDead Letter Queueへ復元する.
    *
-   * @param dlqName DLQ名
-   * @param backupQueueName バックアップキュー名
+   * @param dlqName Dead Letter Queue名
+   * @param backupQueueName Backup Queue名
    * @param message 復元したいメッセージ
    */
   void restoreBackedUpMessage(String dlqName, String backupQueueName, DeadLetteredMessage message);

@@ -1,4 +1,4 @@
-# spr-dlq-management-ui
+# rabbitmq-dlq-management-ui
 DLQ管理コンソール埋め込み用。
 Spring Bootアプリケーションへ組み込んで利用することを想定しています。
 
@@ -67,19 +67,11 @@ Spring Bootは、外部ライブラリ内に定義されたBeanを探して勝�
 
 ```java
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.orm.jpa.EntityScan;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 ...
 
 @SpringBootApplication(scanBasePackages = {
   "アプリケーションルートパッケージ", // アプリケーション側のパッケージルート
   "rabbitmq.console"   // DLQ管理コンソールのパッケージルート
-})
-@EntityScan(basePackages = {
-  "rabbitmq.console.repository.entity" // DLQ管理コンソールのJPAエンティティパッケージルート
-})
-@EnableJpaRepositories(basePackages = {
-  "rabbitmq.console.repository" // DLQ管理コンソールのSpring Data JPAリポジトリパッケージルート
 })
 ```
 #### プロパティ設定
