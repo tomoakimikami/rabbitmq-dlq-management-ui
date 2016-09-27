@@ -17,7 +17,7 @@ import lombok.Setter;
 @Getter
 public class DlqProperties {
   /**
-   * Dead Letter Queue名マップ(キー:DLQ名,値:バックアップキュー名).
+   * Dead Letter Queue名マップ(キー:Dead Letter Queue名,値:Backup Queue名).
    */
   private Map<String, String> deadLetterQueue;
 

@@ -1,13 +1,12 @@
 package rabbitmq.console.service.dto;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Date;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
 
 /**
  * HTTP API用Date型デシリアライザ.
@@ -31,7 +30,7 @@ public class AmqpDateDeserializer extends StdScalarDeserializer<Date> {
    */
   @Override
   public Date deserialize(JsonParser parser, DeserializationContext context)
-      throws IOException, JsonProcessingException {
+      throws IOException {
     Long value = parser.getLongValue(); // エポックタイムだが、単位はミリ秒ではなく秒らしい
     Instant instant = Instant.ofEpochSecond(value);
     return Date.from(instant);

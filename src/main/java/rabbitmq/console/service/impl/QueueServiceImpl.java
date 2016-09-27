@@ -1,19 +1,5 @@
 package rabbitmq.console.service.impl;
 
-import com.rabbitmq.client.AMQP.BasicProperties;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Envelope;
-import com.rabbitmq.client.GetResponse;
-import com.rabbitmq.client.LongString;
-
-import org.springframework.amqp.rabbit.connection.ConnectionFactory;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.amqp.RabbitProperties;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -22,6 +8,21 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.ChannelCallback;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.amqp.RabbitProperties;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import com.rabbitmq.client.AMQP.BasicProperties;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Envelope;
+import com.rabbitmq.client.GetResponse;
+import com.rabbitmq.client.LongString;
 
 import lombok.extern.slf4j.Slf4j;
 import rabbitmq.console.configuration.DlqProperties;
@@ -50,6 +51,11 @@ public class QueueServiceImpl implements QueueService {
    * Mutex ID保持用ヘッダキー.
    */
   private static final String X_MUTEX_KEY = "x-message-mutex";
+
+  /**
+   * RabbitMQからメッセージを取得する際のプリフェッチ数
+   */
+  private static final int PREFETCH_COUNT = 1;
 
   /**
    * Dead Letter Queue関連プロパティ.
@@ -103,6 +109,7 @@ public class QueueServiceImpl implements QueueService {
 
   /**
    * {@inheritDoc}.
+   *
    * @param backupQueueName2
    */
   @Override
@@ -117,37 +124,41 @@ public class QueueServiceImpl implements QueueService {
    * @return メッセージ一覧
    */
   private List<DeadLetteredMessage> listMessages(String dlqName, String backupQueueName) {
-    final String queueName = StringUtils.isEmpty(backupQueueName) ? dlqName : backupQueueName;
     rabbitTemplate.setChannelTransacted(true);
-    List<DeadLetteredMessage> messageList = rabbitTemplate.execute(channel -> {
+    return rabbitTemplate.execute(listMessageActionCallback(dlqName, backupQueueName));
+  }
+
+  /**
+   * Dead Letter Message一覧取得アクション用コールバックを返す
+   *
+   * @param dlqName Dead Letter Queue名
+   * @param backupQueueName Backup Queue名
+   * @return コールバック
+   */
+  private ChannelCallback<List<DeadLetteredMessage>> listMessageActionCallback(String dlqName,
+      String backupQueueName) {
+    final String queueName = StringUtils.isEmpty(backupQueueName) ? dlqName : backupQueueName;
+    final int maxCount = dlqProperties.getMaxCount();
+    return channel -> {
       List<DeadLetteredMessage> list = new ArrayList<>();
-      final int prefetchCount = 1;
-      channel.basicQos(prefetchCount);
-      int maxCount = dlqProperties.getMaxCount();
+      channel.basicQos(PREFETCH_COUNT);
       int count = 0;
       while (count < maxCount) {
-        boolean autoAck = false;
-        GetResponse response = channel.basicGet(queueName, autoAck);
+        GetResponse response = channel.basicGet(queueName, false);
         if (response == null) {
           break;
         }
         DeadLetteredMessage message = convertToMessage(response);
-        if (message == null) { // 対象外メッセージはスキップ
-          continue;
+        if (message != null) { // 対象外メッセージはスキップ
+          message.setDlqName(dlqName);
+          message.setBackupQueueName(backupQueueName);
+          list.add(message);
+          channel.basicNack(response.getEnvelope().getDeliveryTag(), false, true);
+          count++;
         }
-        message.setDlqName(dlqName);
-        message.setBackupQueueName(backupQueueName);
-        log.debug(message.toString());
-        list.add(message);
-        // すべてNack(Unack)して、後でReadyに戻す。
-        boolean multiple = false;
-        boolean requeue = true;
-        channel.basicNack(response.getEnvelope().getDeliveryTag(), multiple, requeue);
-        count++;
       }
       return list;
-    });
-    return messageList;
+    };
   }
 
   /**
@@ -235,51 +246,90 @@ public class QueueServiceImpl implements QueueService {
   @Transactional(readOnly = false)
   @Override
   public void republishMessage(String dlqName, DeadLetteredMessage message) {
-    if (message == null) {
-      return;
+    if (message != null) {
+      // 再登録処理
+      rabbitTemplate.setChannelTransacted(true);
+      rabbitTemplate.execute(republishActionCallback(dlqName, message));
     }
-    // 再登録処理
-    rabbitTemplate.setChannelTransacted(true);
-    rabbitTemplate.execute(channel -> {
-      final int prefetchCount = 1;
-      channel.basicQos(prefetchCount);
+  }
+
+  /**
+   * RabbitMQから取得した対象メッセージに処理を適用するためのコールバックインタフェース
+   *
+   * @author Tomoaki Mikami
+   *
+   */
+  @FunctionalInterface
+  public interface SameMessageCallback {
+    /**
+     * コールバックメソッド
+     *
+     * @param channel チャネル
+     * @param response レスポンス
+     */
+    void doInSameMessage(Channel channel, GetResponse response);
+  }
+
+  /**
+   * RabbitMQからメッセージ取得処理を行うコールバック用テンプレート
+   *
+   * @param dlqName Dead Letter Queue名
+   * @param message Dead Letter Message
+   * @param sameMessageCallback 対象メッセージに適用する処理用のコールバック
+   * @return コールバック
+   */
+  private ChannelCallback<Object> getResponseActionCallback(String dlqName,
+      DeadLetteredMessage message, SameMessageCallback sameMessageCallback) {
+    XDeath extraDeath = message.getProperties().getHeaders().getExtraDeaths().get(0);
+    return channel -> {
+      channel.basicQos(PREFETCH_COUNT);
       while (true) {
-        boolean autoAck = false;
-        GetResponse response = channel.basicGet(dlqName, autoAck);
+        GetResponse response = channel.basicGet(dlqName, false);
         if (response == null) {
           break;
         }
-        // 再登録対象だけack。それ以外はNack(Unack)して、後でReadyに戻す。
-        XDeath extraDeath = message.getProperties().getHeaders().getExtraDeaths().get(0);
-        boolean multiple = false;
         if (isSameMessage(message, response)) {
-          channel.basicAck(response.getEnvelope().getDeliveryTag(), multiple);
-          log.info(
-              String.format("Message Acked: %s, %s", extraDeath.getTime(), extraDeath.getQueue()));
-          // 再登録
-          republishDeadLetteredMessage(dlqName, channel,
-              response);
+          channel.basicAck(response.getEnvelope().getDeliveryTag(), false);
+          logAcked(extraDeath);
+          if (sameMessageCallback != null) {
+            sameMessageCallback.doInSameMessage(channel, response);
+          }
         } else {
-          boolean requeue = true;
-          channel.basicNack(response.getEnvelope().getDeliveryTag(), multiple, requeue);
-          log.info(String.format("Message Unacked: %s, %s", extraDeath.getTime(),
-              extraDeath.getQueue()));
+          channel.basicNack(response.getEnvelope().getDeliveryTag(), false, true);
+          logUnacked(extraDeath);
         }
       }
       return null;
+    };
+  }
+
+  /**
+   * 再登録アクション用コールバックを返す
+   *
+   * @param dlqName Dead Letter Queue名
+   * @param message Dead Lettered Message
+   * @return コールバック
+   */
+  private ChannelCallback<Object> republishActionCallback(String dlqName,
+      DeadLetteredMessage message) {
+    return getResponseActionCallback(dlqName, message, (channel, response) -> {
+      try {
+        republishDeadLetteredMessage(channel, response);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     });
   }
 
   /**
    * 受信したDead Letterメッセージを元のキューへ再登録する.
    *
-   * @param dlqName DLQ名
    * @param channel チャネル
    * @param response 受信メッセージ
    * @throws IOException IOエラー発生時
    */
-  private void republishDeadLetteredMessage(String dlqName, Channel channel,
-      GetResponse response) throws IOException {
+  private void republishDeadLetteredMessage(Channel channel, GetResponse response)
+      throws IOException {
     Map<String, Object> extraDeathMap = extractXDeathMap(response);
     if (extraDeathMap.isEmpty()) {
       return;
@@ -308,12 +358,12 @@ public class QueueServiceImpl implements QueueService {
    * @return x-deathヘッダ情報
    */
   private Map<String, Object> extractXDeathMap(GetResponse response) {
-    Map<String, Object> extraDeathMap = new HashMap<String, Object>();
+    Map<String, Object> extraDeathMap = new HashMap<>();
     Map<String, Object> headers = response.getProps().getHeaders();
     if (headers != null) {
       @SuppressWarnings("unchecked")
       List<Map<String, Object>> extraDeathList = (List<Map<String, Object>>) headers
-          .getOrDefault(X_DEATH_KEY, new ArrayList<Map<String, Object>>());
+          .getOrDefault(X_DEATH_KEY, new ArrayList<>());
       if (!extraDeathList.isEmpty()) {
         extraDeathMap = extraDeathList.get(0);
       }
@@ -332,11 +382,8 @@ public class QueueServiceImpl implements QueueService {
     // メッセージIDを再優先で比較
     String responseMessageId = response.getProps().getMessageId();
     String messageId = deadLetteredMessage.getProperties().getMessageId();
-    if (!StringUtils.isEmpty(messageId) && !StringUtils.isEmpty(responseMessageId)) {
-      if (messageId.equals(responseMessageId)) {
-        return true;
-      }
-      return false;
+    if (StringUtils.hasText(messageId) && StringUtils.hasText(responseMessageId)) {
+      return messageId.equals(responseMessageId);
     }
     MessageHeader messageHeader = deadLetteredMessage.getProperties().getHeaders();
     String mutex = messageHeader.getExtraMessageMutex();
@@ -346,17 +393,11 @@ public class QueueServiceImpl implements QueueService {
 
     Map<String, Object> extraDeathMap = extractXDeathMap(response);
     if (!extraDeathMap.isEmpty()) {
-      // タイムスタンプ
       Date targetTime = (Date) extraDeathMap.get("time");
-      // 元キュー
       LongString targetQueue = (LongString) extraDeathMap.get("queue");
-      // mutex id
       LongString mutexKey = (LongString) response.getProps().getHeaders().get(X_MUTEX_KEY);
-
-      if (targetTime.equals(deadLeteredTime) && originalQueue.equals(safetyToString(targetQueue))
-          && mutex.equals(safetyToString(mutexKey))) {
-        return true;
-      }
+      return targetTime.equals(deadLeteredTime) && originalQueue.equals(safetyToString(targetQueue))
+          && mutex.equals(safetyToString(mutexKey));
     }
     return false;
   }
@@ -367,136 +408,150 @@ public class QueueServiceImpl implements QueueService {
   @Transactional(readOnly = false)
   @Override
   public void deleteMessage(String dlqName, DeadLetteredMessage message) {
-    if (message == null) {
-      return;
+    if (message != null) {
+      // キューから削除
+      rabbitTemplate.setChannelTransacted(true);
+      rabbitTemplate.execute(deleteActionCallback(dlqName, message));
+
+      // ミューテックス削除
+      deleteMutex(message);
     }
+  }
 
-    // キューから削除
-    rabbitTemplate.setChannelTransacted(true);
-    rabbitTemplate.execute(channel -> {
-      final int prefetchCount = 1;
-      channel.basicQos(prefetchCount);
-      while (true) {
-        boolean autoAck = false;
-        GetResponse response = channel.basicGet(dlqName, autoAck);
-        if (response == null) {
-          break;
-        }
-        // 削除対象だけack。それ以外はNack(Unack)して、後でReadyに戻す。
-        XDeath extraDeath = message.getProperties().getHeaders().getExtraDeaths().get(0);
-        boolean multiple = false;
-        if (isSameMessage(message, response)) {
-          channel.basicAck(response.getEnvelope().getDeliveryTag(), multiple);
-          log.info(
-              String.format("Message Acked: %s, %s", extraDeath.getTime(), extraDeath.getQueue()));
-        } else {
-          boolean requeue = true;
-          channel.basicNack(response.getEnvelope().getDeliveryTag(), multiple, requeue);
-          log.info(String.format("Message Unacked: %s, %s", extraDeath.getTime(),
-              extraDeath.getQueue()));
-        }
-      }
-      return null;
-    });
+  /**
+   * Dead Letter Queueから削除するアクション用のコールバックを返す
+   *
+   * @param dlqName Dead Letter Queue名
+   * @param message Dead Letter Message
+   * @return コールバック
+   */
+  private ChannelCallback<Object> deleteActionCallback(String dlqName,
+      DeadLetteredMessage message) {
+    return getResponseActionCallback(dlqName, message, null);
+  }
 
-    // ミューテックス削除
-    deleteMutex(message);
+  /**
+   * Queueから正常にメッセージを取得した旨、ログ出力する
+   *
+   * @param extraDeath x-deathヘッダ情報
+   */
+  private void logAcked(XDeath extraDeath) {
+    log.info(String.format("Message Acked: %s, %s", extraDeath.getTime(), extraDeath.getQueue()));
+  }
+
+  /**
+   * Queueにメッセージを戻した旨、ログ出力する
+   *
+   * @param extraDeath x-deathヘッダ情報
+   */
+  private void logUnacked(XDeath extraDeath) {
+    log.info(String.format("Message Unacked: %s, %s", extraDeath.getTime(), extraDeath.getQueue()));
   }
 
   /**
    * {@inheritDoc}.
    */
   @Override
-  public void deleteAndBackupMessage(String dlqName, String backupQueueName, DeadLetteredMessage message) {
-    if (message == null) {
-      return;
-    }
+  public void deleteAndBackupMessage(String dlqName, String backupQueueName,
+      DeadLetteredMessage message) {
+    if (message != null) {
+      // Dead Letterキューから削除
+      rabbitTemplate.setChannelTransacted(true);
+      rabbitTemplate.execute(deleteAndBackupActionCallback(dlqName, backupQueueName, message));
 
-    // Dead Letterキューから削除
-    rabbitTemplate.setChannelTransacted(true);
-    rabbitTemplate.execute(channel -> {
-      final int prefetchCount = 1;
-      channel.basicQos(prefetchCount);
+      // ミューテックス削除
+      deleteMutex(message);
+    }
+  }
+
+  /**
+   * Dead Letter Queueから削除およびBackup Queueへバックアップするアクション用のコールバックを返す
+   *
+   * @param dlqName Dead Letter Queue名
+   * @param backupQueueName Backup Queue名
+   * @param message Dead Letter Message
+   * @return コールバック
+   */
+  private ChannelCallback<Object> deleteAndBackupActionCallback(String dlqName,
+      String backupQueueName, DeadLetteredMessage message) {
+    return channel -> {
+      channel.basicQos(PREFETCH_COUNT);
       while (true) {
-        boolean autoAck = false;
-        GetResponse response = channel.basicGet(dlqName, autoAck);
+        GetResponse response = channel.basicGet(dlqName, false);
         if (response == null) {
           break;
         }
-        // 削除対象だけack。それ以外はNack(Unack)して、後でReadyに戻す。
         XDeath extraDeath = message.getProperties().getHeaders().getExtraDeaths().get(0);
-        boolean multiple = false;
         if (isSameMessage(message, response)) {
-          // 削除対象メッセージをバックアップキューへ登録
-          backupDeadLetteredMessage(dlqName, backupQueueName, channel, response);
-          channel.basicAck(response.getEnvelope().getDeliveryTag(), multiple);
-          log.info(
-              String.format("Message Acked: %s, %s", extraDeath.getTime(), extraDeath.getQueue()));
+          backupDeadLetteredMessage(backupQueueName, channel, response);
+          channel.basicAck(response.getEnvelope().getDeliveryTag(), false);
+          logAcked(extraDeath);
         } else {
-          boolean requeue = true;
-          channel.basicNack(response.getEnvelope().getDeliveryTag(), multiple, requeue);
-          log.info(String.format("Message Unacked: %s, %s", extraDeath.getTime(),
-              extraDeath.getQueue()));
+          channel.basicNack(response.getEnvelope().getDeliveryTag(), false, true);
+          logUnacked(extraDeath);
         }
       }
       return null;
-    });
-
-    // ミューテックス削除
-    deleteMutex(message);
+    };
   }
 
   /**
    * {@inheritDoc}.
    */
   @Override
-  public void restoreBackedUpMessage(String dlqName, String backupQueueName, DeadLetteredMessage message) {
-    if (message == null) {
-      return;
-    }
+  public void restoreBackedUpMessage(String dlqName, String backupQueueName,
+      DeadLetteredMessage message) {
+    if (message != null) {
+      // バックアップキューから削除
+      rabbitTemplate.setChannelTransacted(true);
+      rabbitTemplate.execute(restoreActionCallback(dlqName, backupQueueName, message));
 
-    // バックアップキューから削除
-    rabbitTemplate.setChannelTransacted(true);
-    rabbitTemplate.execute(channel -> {
-      final int prefetchCount = 1;
-      channel.basicQos(prefetchCount);
+      // ミューテックス復活
+      saveMutex(message);
+    }
+  }
+
+  /**
+   * Backup Queueからリストアするアクション用のコールバックを返す
+   *
+   * @param dlqName Dead Letter Queue名
+   * @param backupQueueName Backup Queue名
+   * @param message Dead Letter Message
+   * @return コールバック
+   */
+  private ChannelCallback<Object> restoreActionCallback(String dlqName, String backupQueueName,
+      DeadLetteredMessage message) {
+    return channel -> {
+      channel.basicQos(PREFETCH_COUNT);
       while (true) {
-        boolean autoAck = false;
-        GetResponse response = channel.basicGet(backupQueueName, autoAck);
+        GetResponse response = channel.basicGet(backupQueueName, false);
         if (response == null) {
           break;
         }
-        // 削除対象だけack。それ以外はNack(Unack)して、後でReadyに戻す。
         XDeath extraDeath = message.getProperties().getHeaders().getExtraDeaths().get(0);
-        boolean multiple = false;
         if (isSameMessage(message, response)) {
-          // 復元対象メッセージをDead Letterキューへ登録
-          restoreBackedUpMessage(dlqName, backupQueueName, channel, response);
-          channel.basicAck(response.getEnvelope().getDeliveryTag(), multiple);
-          log.info(
-              String.format("Message Acked: %s, %s", extraDeath.getTime(), extraDeath.getQueue()));
+          restoreBackedUpMessage(dlqName, channel, response);
+          channel.basicAck(response.getEnvelope().getDeliveryTag(), false);
+          logAcked(extraDeath);
         } else {
-          boolean requeue = true;
-          channel.basicNack(response.getEnvelope().getDeliveryTag(), multiple, requeue);
-          log.info(String.format("Message Unacked: %s, %s", extraDeath.getTime(),
-              extraDeath.getQueue()));
+          channel.basicNack(response.getEnvelope().getDeliveryTag(), false, true);
+          logUnacked(extraDeath);
         }
       }
       return null;
-    });
-
-    // ミューテックス復活
-    saveMutex(message);
+    };
   }
 
   /**
    * バックアップメッセージをDead Letterキューへ再登録する.
    *
+   * @param dlqName Dead Letter Queue名
    * @param channel チャネル
    * @param response メッセージ
    * @throws IOException IOエラー発生時
    */
-  private void restoreBackedUpMessage(String dlqName, String backupQueueName, Channel channel, GetResponse response) throws IOException {
+  private void restoreBackedUpMessage(String dlqName, Channel channel, GetResponse response)
+      throws IOException {
     BasicProperties props = response.getProps();
     byte[] body = response.getBody();
     String exchange = "";
@@ -510,11 +565,13 @@ public class QueueServiceImpl implements QueueService {
   /**
    * 受信したDead Letterメッセージをバックアップキューへ再登録する.
    *
+   * @param backupQueueName Backup Queue名
    * @param channel チャネル
    * @param response 受信メッセージ
    * @throws IOException IOエラー発生時
    */
-  private void backupDeadLetteredMessage(String dlqName, String backupQueueName, Channel channel, GetResponse response) throws IOException {
+  private void backupDeadLetteredMessage(String backupQueueName, Channel channel,
+      GetResponse response) throws IOException {
     BasicProperties props = response.getProps();
     byte[] body = response.getBody();
     String exchange = "";
@@ -574,7 +631,8 @@ public class QueueServiceImpl implements QueueService {
    * {@inheritDoc}.
    */
   @Override
-  public DeadLetteredMessage findBackedUpMessage(String dlqName, String backupQueueName, String id) {
+  public DeadLetteredMessage findBackedUpMessage(String dlqName, String backupQueueName,
+      String id) {
     List<DeadLetteredMessage> messages = listBackedUpMessages(dlqName, backupQueueName);
     return messages.stream()//
         .filter(message -> id.equals(message.getProperties().getMessageId()))//

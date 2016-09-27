@@ -1,9 +1,13 @@
 buildscript {
-  repositories { mavenCentral() }
-  ext {
-    springBootVersion = '1.3.5.RELEASE'
+  repositories {
+    maven { url "https://plugins.gradle.org/m2/" }
+    mavenCentral()
   }
-  dependencies { classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}") }
+  ext { springBootVersion = '1.3.5.RELEASE' }
+  dependencies {
+    classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+    classpath "org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:2.1-rc3"
+  }
 }
 
 task wrapper(type: Wrapper) { gradleVersion = '2.13' }
@@ -14,6 +18,7 @@ apply plugin: 'maven-publish'
 apply plugin: 'idea'
 apply plugin: 'eclipse'
 apply plugin: 'spring-boot'
+apply plugin: 'org.sonarqube'
 
 group = 'spring.support'
 version = '1.0.2-SNAPSHOT'
@@ -28,9 +33,7 @@ repositories {
 }
 
 // javacオプション
-compileJava {
-  options.encoding = 'UTF-8'
-}
+compileJava { options.encoding = 'UTF-8' }
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
@@ -78,23 +81,15 @@ task sourcesJar(type: Jar, dependsOn:classes) {
   from sourceSets.main.allSource
 }
 
-artifacts {
-  archives sourcesJar
-}
+artifacts { archives sourcesJar }
 
 // spring-bootプラグインがjarの加工をするのを抑止
-bootRepackage {
-  enabled = false
-}
+bootRepackage { enabled = false }
 
 jar {
   baseName = 'dlq-management-ui'
-  from("${projectDir}/src/main/resources/templates") {
-    into "META-INF/resources/templates"
-  }
-  from("${projectDir}/src/main/resources/static") {
-    into "META-INF/resources/static"
-  }
+  from("${projectDir}/src/main/resources/templates") { into "META-INF/resources/templates" }
+  from("${projectDir}/src/main/resources/static") { into "META-INF/resources/static" }
 }
 
 // publish
@@ -105,9 +100,7 @@ publishing {
 
       from components.java
 
-      artifact sourcesJar {
-        classifier "sources"
-      }
+      artifact sourcesJar { classifier "sources" }
 
       pom.withXml {
         asNode().appendNode('description', 'Embeddable RabbitMQ DLQ Management Console')
@@ -122,5 +115,18 @@ publishing {
         url "http://${nexusHost}${nexusPath}-releases/"
       }
     }
+  }
+}
+
+// gradle sonarqubeでスキャナーを起動します。
+sonarqube {
+  properties {
+    property "sonar.scm.disabled", true
+    property "sonar.sourceEncoding", "UTF-8"
+    property "sonar.exclusions", "src/main/resources/static/light/js/*.js,src/main/resources/static/light/css/*.css"
+    // 接続するsonarqubeサーバ情報
+    property "sonar.host.url", "http://localhost:9000"
+    property "sonar.login", "admin"
+    property "sonar.password", "admin"
   }
 }
