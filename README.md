@@ -1,4 +1,4 @@
-# spr-dlq-management-ui
+# rabbitmq-dlq-management-ui
 DLQ管理コンソール埋め込み用。
 Spring Bootアプリケーションへ組み込んで利用することを想定しています。
 
