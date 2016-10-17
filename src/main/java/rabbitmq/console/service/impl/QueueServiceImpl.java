@@ -150,11 +150,11 @@ public class QueueServiceImpl implements QueueService {
           break;
         }
         DeadLetteredMessage message = convertToMessage(response);
+        channel.basicNack(response.getEnvelope().getDeliveryTag(), false, true);
         if (message != null) { // 対象外メッセージはスキップ
           message.setDlqName(dlqName);
           message.setBackupQueueName(backupQueueName);
           list.add(message);
-          channel.basicNack(response.getEnvelope().getDeliveryTag(), false, true);
           count++;
         }
       }
