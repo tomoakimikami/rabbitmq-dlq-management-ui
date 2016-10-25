@@ -8,3 +8,10 @@
 	height: 33px;
 	width: 175px;
 }
+
+/*
+ * ダイアログでのコンテンツ改行不具合回避
+ */
+.form-control-static {
+  word-wrap:break-word;
+}
